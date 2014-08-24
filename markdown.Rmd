@@ -1,0 +1,92 @@
+---
+title: "Machine Learning Assignment"
+author: "Bram van Zanten"
+date: "Thursday, August 21, 2014"
+output: html_document
+---
+
+1. Loading Data
+===============
+First, let's load the Caret library and the training (named main) and testing (named exam) data.
+
+```{r}
+library(caret)
+
+main = read.csv("pml-training.csv")
+exam  = read.csv("pml-testing.csv")
+```
+
+2. Preparing Data
+=================
+Now we split the training data (main) into training and testing dataset. We've kept the train part of the data small (p=0.10) for processing speed, ideally this should be a 40/60 split.
+```{r}
+base <- createDataPartition(y=main$classe, p=0.10, list=FALSE)
+train <- main[base,]
+test <- main[-base,]
+```
+
+3. Cleaning Data
+=================
+The next step is to proceed with some basic data cleaning. Variables with missing (NA & Empty) values are removed. 
+We also remove some variables that would logically not be indicated to have predictive power for the question at hand (such as timestamp, username and row number).
+```{r}
+newtrain = train[,!sapply(train,function(x) any(is.na(x)))]
+newtrain = newtrain[,!sapply(newtrain,function(x) any(x == ""))]
+newtrain$X <- NULL
+newtrain$raw_timestamp_part_1 <- NULL
+newtrain$raw_timestamp_part_2 <- NULL
+newtrain$num_window <- NULL 
+newtrain$new_window <- NULL
+newtrain$cvtd_timestamp <- NULL
+newtrain$user_name <- NULL
+```
+
+4. Fitting Model
+================
+Next step is to setup the actual model. We're using a random forest algorithm.
+
+```{r}
+ctrl <- trainControl(method = "cv", number = 4, allowParallel = TRUE)
+modelFit <- train(classe ~.,data=newtrain, method="rf", 
+                  prof = TRUE, trControl = ctrl)
+modelFit
+```
+
+As we can see from the accuracy measures, the indicicated predictive performance of the model is quite good. 
+
+5. Cross-Validation
+===================
+To assess potential overfitting issues, we now cross-validate the model against the test data we set aside earlier. 
+
+```{r}
+pred <- predict(modelFit, test) 
+test$predRight <- pred == 
+test$classe 
+table(pred, test$classe)
+```
+
+
+6. Preparing Answers
+====================
+Finally, we apply the model to the 'exam' (testing) data and use the provided function to write 20 text files.
+```{r}
+
+pred2 <- predict(modelFit, exam)
+exam2 <- exam
+exam2$classe <- pred2
+
+pml_write_files = function(x) {
+  n = length(x)
+  for (i in 1:n) {
+    filename = paste0("problem_id_", i, ".txt")
+    write.table(x[i], file = filename, quote = FALSE, row.names = FALSE, 
+                col.names = FALSE)
+  }
+}
+
+
+answers <- exam2$classe
+
+pml_write_files(answers)
+answers
+```
